@@ -29,11 +29,11 @@ conda install torch
 ```
 
 ## 准备
-### 从腾讯AI Lab下载语料库
+从腾讯AI Lab下载语料库
 ```shell
 wget https://ai.tencent.com/ailab/nlp/zh/data/tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz # v0.2.0 100维-Small
 ```
-### 解压语料库
+解压语料库
 ```shell
 tar -zxvf tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz
 ```
