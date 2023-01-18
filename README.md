@@ -38,5 +38,15 @@ wget https://ai.tencent.com/ailab/nlp/zh/data/tencent-ailab-embedding-zh-d100-v0
 tar -zxvf tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz
 ```
 
+## 训练
+```python
+python train.py --datadir {datadir} --epochs 30 --lr 1e-4 --max_length 32 --batch_size 8 --savepath ./results --gpu 0 --w2v_path {w2v_path}
+```
+
+## 推理
+```python
+python inference.py --batch_size 8 --max_length 32 --savepath ./results --datadir {datadir} --model_path {model_path} --gpu 0 --w2v_path {w2v_path}
+```
+
 
 
