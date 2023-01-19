@@ -5,7 +5,7 @@ from tqdm import tqdm
 from gensim.models import KeyedVectors
 import time
 from torch.utils.data import DataLoader
-from models import SemNN 
+from models import SemNN,SemLSTM
 import os
 import torch.nn as nn
 import json
@@ -17,6 +17,7 @@ def inference(args):
     w2v_path = args.w2v_path
     max_length = args.max_length
     model_path = args.model_path
+    model_name = args.model_name
     
     begin_time = time.perf_counter()
     w2v_model = KeyedVectors.load_word2vec_format(w2v_path,binary=False)
@@ -26,6 +27,7 @@ def inference(args):
     
     device = torch.device("cuda:{}".format(args.gpu) if torch.cuda.is_available() else 'cpu')
     
+    save_path = os.path.join(save_path,model_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     
@@ -38,12 +40,21 @@ def inference(args):
     
     dataloader = DataLoader(test_dataset,batch_size=batch_size,shuffle=False,num_workers=4)
     
-    model = SemNN(
-        in_feat=100,
-        num_labels=len(data.get_labels()),
-        dropout_prob=0.1,
-        w2v_mapping=w2v_model
-    )
+    if model_name == "SemNN":
+        model = SemNN(
+            in_feat=100,
+            num_labels=len(data.get_labels()),
+            dropout_prob=0.1,
+            w2v_mapping=w2v_model
+        )
+    if model_name == "SemLSTM":
+        model = SemLSTM(
+            in_feat=100,
+            num_labels=len(data.get_labels()),
+            dropout_prob=0.1,
+            w2v_mapping=w2v_model
+        )
+    
     
     checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
     model.load_state_dict(checkpoint['state_dict'])
@@ -99,6 +110,12 @@ def inference(args):
 
 if __name__ == "__main__":
     parse = argparse.ArgumentParser()
+    
+    parse.add_argument('--model_name',type=str,default="SemNN",help="Model name for train")
+    
+    parse.add_argument('--in_feat',type=int,default=100,help="Length of features for embbeding word")
+    
+    parse.add_argument('--dropout_prob',type=float,default=0.1,help="Dropout ratio for dropout layers")
     
     parse.add_argument('--batch_size',type=int,default=128,help="Batch-size for train")
     

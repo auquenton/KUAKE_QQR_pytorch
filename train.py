@@ -5,7 +5,7 @@ from tqdm import tqdm
 from gensim.models import KeyedVectors
 import time
 from torch.utils.data import DataLoader
-from models import SemNN 
+from models import SemNN,SemLSTM,SemAttention
 import os
 import torch.nn as nn
 import torch.optim as optim
@@ -18,6 +18,9 @@ def train(args):
     w2v_path = args.w2v_path
     max_length = args.max_length
     epochs = args.epochs
+    model_name = args.model_name
+    dropout_prob = args.dropout_prob
+    in_feat = args.in_feat
     
     begin_time = time.perf_counter()
     w2v_model = KeyedVectors.load_word2vec_format(w2v_path,binary=False)
@@ -25,8 +28,10 @@ def train(args):
     print("Load {} cost {:.2f}s".format(w2v_path,end_time-begin_time))
     w2v_map = w2v_model.key_to_index
     
+    
     device = torch.device("cuda:{}".format(args.gpu) if torch.cuda.is_available() else 'cpu')
     
+    save_path = os.path.join(save_path,model_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     
@@ -41,15 +46,30 @@ def train(args):
     dataset = {'train':train_dataset,'val':val_dataset,'test':test_dataset}
     len_dataset = {'train':train_examples_num,'val':val_examples_num}
     
-    model = SemNN(
-        in_feat=100,
-        num_labels=len(data.get_labels()),
-        dropout_prob=0.1,
-        w2v_mapping=w2v_model
-    )
+    if model_name == "SemNN":
+        model = SemNN(
+            in_feat=in_feat,
+            num_labels=len(data.get_labels()),
+            dropout_prob=dropout_prob,
+            w2v_mapping=w2v_model
+        )
+    elif model_name == "SemLSTM":
+        model = SemLSTM(in_feat=in_feat,
+                        num_labels=len(data.get_labels()),
+                        dropout_prob=dropout_prob,
+                        w2v_mapping=w2v_model)
+    elif model_name == "SemAttention":
+        model = SemAttention(
+            in_feat=in_feat,
+            num_labels = len(data.get_labels()),
+            dropout_prob=dropout_prob,
+            w2v_mapping=w2v_model
+        )
     print(model)
     
     model_paramters = model.parameters()
+    print('Model Name: '+model_name)
+    print('Total params: %.2fM' % (sum(p.numel() for p in model_paramters) / 1000000.0))
     
     criterion = nn.CrossEntropyLoss()
     criterion.to(device)
@@ -122,13 +142,20 @@ def train(args):
 
 if __name__ == "__main__":
     parse = argparse.ArgumentParser()
+    
+    parse.add_argument('--model_name',type=str,default="SemAttention",help="Model name for train [SemNN,SemLSTM,SemAttention]")
+    
     parse.add_argument('--batch_size',type=int,default=8,help="Batch-size for train")
+    
+    parse.add_argument('--in_feat',type=int,default=100,help="Length of features for embbeding word")
     
     parse.add_argument('--max_length',type=int,default=32,help="Max length for setence")
     
     parse.add_argument('--epochs',type=int,default=50,help="Set epochs for train")
     
-    parse.add_argument('--lr',type=float,default=1e-4,help="Learning Rate for train")
+    parse.add_argument('--lr',type=float,default=1e-3,help="Learning Rate for train")
+    
+    parse.add_argument('--dropout_prob',type=float,default=0.1,help="Dropout ratio for dropout layers")
     
     parse.add_argument('--savepath',type=str,default="./results",help="Save dir for trained model")
     
