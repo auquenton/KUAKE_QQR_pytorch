@@ -39,6 +39,18 @@ Decompress the corpus
 tar -zxvf tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz
 ```
 
+Download the bert model and configuration file
+
+```shell
+mkdir chinese-bert-wwm-ext
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/added_tokens.json
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/config.json
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/pytorch_model.bin
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/special_tokens_map.json
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/tokenizer.json
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/tokenizer_config.json
+wget -P chinese-bert-wwm-ext https://huggingface.co/hfl/chinese-bert-wwm-ext/resolve/main/vocab.txt
+```
 ## Train
 
 ```python
