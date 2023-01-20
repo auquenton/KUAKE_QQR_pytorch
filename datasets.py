@@ -18,7 +18,7 @@ from torch.utils.data import Dataset
 import torch
 import numpy as np
 import logging
-
+from transformers import InputFeatures
 jieba.setLogLevel(logging.INFO)
 
 
@@ -133,5 +133,57 @@ class QQRDataset(Dataset):
             'idx':idx
         }
         
+class BertClassificationDataset(Dataset):
     
-
+    def __init__(
+        self,
+        examples,
+        tokenizer,
+        label_list,
+        max_length,
+        processer=None
+        ):
+        super().__init__()
+        
+        self.examples = examples
+        self.max_length = max_length
+        self.tokenizer =tokenizer
+        self.processor = processer
+        
+        self.label2id = {label:idx for idx,label in enumerate(label_list)}
+        self.id2label = {idx:label for idx,label in enumerate(label_list)}
+        
+    def __len__(self):
+        return len(self.examples)
+    
+    def __getitem__(self, index):
+        example = self.examples[index]
+        if(example.label in self.label2id):
+            label = self.label2id[example.label]
+        else:
+            label = 3
+        
+        inputs = self.tokenizer(
+            text = example.text_a,
+            text_pair = example.text_b,
+            padding = 'max_length',
+            truncation = True,
+            max_length = self.max_length
+        )
+        
+        input_ids = torch.tensor(inputs.get('input_ids'),dtype=torch.long)
+        attention_mask = torch.tensor(inputs.get('attention_mask'),dtype=torch.long)
+        token_type_ids = torch.tensor(inputs.get('token_type_ids'),dtype=torch.long)
+        label = torch.tensor(label,dtype=torch.long)
+        
+        return {
+            'labels':label,
+            'text_a':example.text_a,
+            'text_b':example.text_b,
+            'idx':example.id,
+            'input_ids':input_ids,
+            'token_type_ids':token_type_ids,
+            'attention_mask':attention_mask
+        }
+        
+        

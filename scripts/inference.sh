@@ -1,0 +1,1 @@
+python inference.py --model_name Bert --w2v_path chinese-bert-wwm-ext --model_path results/Bert/best_model.pth.tar --savepath results/Bert

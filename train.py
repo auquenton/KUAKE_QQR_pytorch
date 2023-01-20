@@ -1,6 +1,6 @@
 import torch
 import argparse
-from datasets import QQRDataset,QQR_data
+from datasets import QQRDataset,QQR_data,BertClassificationDataset
 from tqdm import tqdm
 from gensim.models import KeyedVectors
 import time
@@ -9,6 +9,13 @@ from models import SemNN,SemLSTM,SemAttention
 import os
 import torch.nn as nn
 import torch.optim as optim
+from transformers import AutoTokenizer
+from transformers import BertForSequenceClassification
+
+model_type1_list = ['SemNN','SemAttention','SemLSTM']
+model_type2_list = ['Bert']
+
+
 
 def train(args):
     batch_size = args.batch_size
@@ -22,12 +29,15 @@ def train(args):
     dropout_prob = args.dropout_prob
     in_feat = args.in_feat
     
-    begin_time = time.perf_counter()
-    w2v_model = KeyedVectors.load_word2vec_format(w2v_path,binary=False)
-    end_time = time.perf_counter()
-    print("Load {} cost {:.2f}s".format(w2v_path,end_time-begin_time))
-    w2v_map = w2v_model.key_to_index
-    
+    if model_name in model_type1_list:
+        begin_time = time.perf_counter()
+        w2v_model = KeyedVectors.load_word2vec_format(w2v_path,binary=False)
+        end_time = time.perf_counter()
+        print("Load {} cost {:.2f}s".format(w2v_path,end_time-begin_time))
+        w2v_map = w2v_model.key_to_index
+        
+    elif model_name in model_type2_list:
+        tokenizer = AutoTokenizer.from_pretrained(w2v_path)
     
     device = torch.device("cuda:{}".format(args.gpu) if torch.cuda.is_available() else 'cpu')
     
@@ -36,14 +46,19 @@ def train(args):
         os.makedirs(save_path)
     
     data = QQR_data(data_dir)
-    train_dataset = QQRDataset(data.get_train_data(),data.get_labels(),w2v_map=w2v_map,max_length=max_length)
-    val_dataset = QQRDataset(data.get_dev_data(),data.get_labels(),w2v_map=w2v_map,max_length=max_length)
-    test_dataset = QQRDataset(data.get_test_data,data.get_labels(),w2v_map=w2v_map,max_length=max_length)
+    
+    if model_name in model_type1_list:
+        train_dataset = QQRDataset(data.get_train_data(),data.get_labels(),w2v_map=w2v_map,max_length=max_length)
+        val_dataset = QQRDataset(data.get_dev_data(),data.get_labels(),w2v_map=w2v_map,max_length=max_length)
+       
+    elif model_name in model_type2_list:
+        train_dataset = BertClassificationDataset(data.get_train_data(),tokenizer=tokenizer,label_list=data.get_labels(),max_length=max_length)
+        val_dataset = BertClassificationDataset(data.get_dev_data(),tokenizer=tokenizer,label_list=data.get_labels(),max_length=max_length)
     
     train_examples_num = len(train_dataset)
     val_examples_num = len(val_dataset)
     
-    dataset = {'train':train_dataset,'val':val_dataset,'test':test_dataset}
+    dataset = {'train':train_dataset,'val':val_dataset}
     len_dataset = {'train':train_examples_num,'val':val_examples_num}
     
     if model_name == "SemNN":
@@ -65,19 +80,22 @@ def train(args):
             dropout_prob=dropout_prob,
             w2v_mapping=w2v_model
         )
+    elif model_name == "Bert":
+        model = BertForSequenceClassification.from_pretrained(w2v_path,num_labels=len(data.get_labels()))
+     
     print(model)
     
     model_paramters = model.parameters()
-    print('Model Name: '+model_name)
-    print('Total params: %.2fM' % (sum(p.numel() for p in model_paramters) / 1000000.0))
     
     criterion = nn.CrossEntropyLoss()
     criterion.to(device)
     model.to(device)
     
-    
     optimizer = optim.SGD(model_paramters, lr=lr, momentum=0.9, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10,gamma=0.1)
+    print('Model Name: '+model_name)
+    print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
+    
     best_val_acc = 0.0
     for epoch in range(epochs):
         for phase in ['train','val']:
@@ -86,27 +104,39 @@ def train(args):
             
             #Train or eval
             if(phase=='train'):
-                optimizer.step()
+                scheduler.step()
                 model.train()
             else:
                 model.eval()
             
             dataloader = DataLoader(dataset[phase],batch_size=batch_size,shuffle=True,num_workers=4)
             for text_example in tqdm(dataloader):
-                text_a_inputs_id = text_example["text_a_inputs_id"].to(device)
-                text_b_inputs_id = text_example["text_b_inputs_id"].to(device)
-                text_a_attention_mask = text_example["text_a_attention_mask"].to(device)
-                text_b_attention_mask = text_example["text_b_attention_mask"].to(device)
+                if model_name in model_type1_list:
+                    text_a_inputs_id = text_example["text_a_inputs_id"].to(device)
+                    text_b_inputs_id = text_example["text_b_inputs_id"].to(device)
+                    text_a_attention_mask = text_example["text_a_attention_mask"].to(device)
+                    text_b_attention_mask = text_example["text_b_attention_mask"].to(device)
+                elif model_name in model_type2_list:
+                    input_ids = text_example.get('input_ids').to(device)
+                    token_type_ids = text_example.get('token_type_ids').to(device)
+                    attention_mask = text_example.get('attention_mask').to(device)
+                    
                 labels = text_example['labels'].to(device)
                 
                 optimizer.zero_grad()
                 
                 if(phase=='train'):
-                    outputs = model(text_a_inputs_id,text_b_inputs_id,text_a_attention_mask,text_b_attention_mask)
+                    if model_name in model_type1_list:
+                        outputs = model(text_a_inputs_id,text_b_inputs_id,text_a_attention_mask,text_b_attention_mask)
+                    elif model_name in model_type2_list:
+                        outputs = model(input_ids=input_ids,token_type_ids=token_type_ids,attention_mask=attention_mask,return_dict=True).get('logits')
                 else:
                     with torch.no_grad():
-                        outputs = model(text_a_inputs_id,text_b_inputs_id,text_a_attention_mask,text_b_attention_mask)
-
+                        if model_name in model_type1_list:
+                            outputs = model(text_a_inputs_id,text_b_inputs_id,text_a_attention_mask,text_b_attention_mask)
+                        elif model_name in model_type2_list:
+                            outputs = model(input_ids=input_ids,token_type_ids=token_type_ids,attention_mask=attention_mask,return_dict=True).get('logits')
+                            
                 probs = nn.Softmax(dim=1)(outputs)
                 preds = torch.max(probs,1)[1]
                 # print(preds.sum())
@@ -143,7 +173,7 @@ def train(args):
 if __name__ == "__main__":
     parse = argparse.ArgumentParser()
     
-    parse.add_argument('--model_name',type=str,default="SemAttention",help="Model name for train [SemNN,SemLSTM,SemAttention]")
+    parse.add_argument('--model_name',type=str,default="SemAttention",help="Model name for train [SemNN,SemLSTM,SemAttention,Bert]")
     
     parse.add_argument('--batch_size',type=int,default=8,help="Batch-size for train")
     

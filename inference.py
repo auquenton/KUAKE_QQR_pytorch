@@ -1,14 +1,20 @@
 import torch
 import argparse
-from datasets import QQRDataset,QQR_data
+from datasets import QQRDataset,QQR_data,BertClassificationDataset
 from tqdm import tqdm
 from gensim.models import KeyedVectors
 import time
 from torch.utils.data import DataLoader
-from models import SemNN,SemLSTM
+from models import SemNN,SemLSTM,SemAttention
+from transformers import AutoTokenizer
 import os
 import torch.nn as nn
 import json
+from transformers import BertForSequenceClassification
+
+model_type1_list = ['SemNN','SemAttention','SemLSTM']
+model_type2_list = ['Bert']
+
 
 def inference(args):
     batch_size = args.batch_size
@@ -18,23 +24,30 @@ def inference(args):
     max_length = args.max_length
     model_path = args.model_path
     model_name = args.model_name
+    in_feat = args.in_feat
+    dropout_prob = args.dropout_prob
     
-    begin_time = time.perf_counter()
-    w2v_model = KeyedVectors.load_word2vec_format(w2v_path,binary=False)
-    end_time = time.perf_counter()
-    print("Loading {} cost {:.2f}s".format(w2v_path,end_time-begin_time))
-    w2v_map = w2v_model.key_to_index
+    if model_name in model_type1_list:
+        begin_time = time.perf_counter()
+        w2v_model = KeyedVectors.load_word2vec_format(w2v_path,binary=False)
+        end_time = time.perf_counter()
+        print("Load {} cost {:.2f}s".format(w2v_path,end_time-begin_time))
+        w2v_map = w2v_model.key_to_index
+        
+    elif model_name in model_type2_list:
+        tokenizer = AutoTokenizer.from_pretrained(w2v_path)
     
     device = torch.device("cuda:{}".format(args.gpu) if torch.cuda.is_available() else 'cpu')
     
-    save_path = os.path.join(save_path,model_name)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     
     data = QQR_data(data_dir)
     
-    test_dataset = QQRDataset(data.get_test_data(),data.get_labels(),w2v_map=w2v_map,max_length=max_length)
-    # print(test_dataset.id2label)
+    if model_name in model_type1_list:
+        test_dataset = QQRDataset(data.get_test_data(),data.get_labels(),w2v_map=w2v_map,max_length=max_length)
+    elif model_name in model_type2_list:
+        test_dataset = BertClassificationDataset(data.get_test_data(),tokenizer=tokenizer,label_list=data.get_labels(),max_length=max_length)
     
     id2label = test_dataset.id2label
     
@@ -44,21 +57,35 @@ def inference(args):
         model = SemNN(
             in_feat=100,
             num_labels=len(data.get_labels()),
-            dropout_prob=0.1,
+            dropout_prob=dropout_prob,
             w2v_mapping=w2v_model
         )
-    if model_name == "SemLSTM":
+    elif model_name == "SemLSTM":
         model = SemLSTM(
-            in_feat=100,
+            in_feat=in_feat,
             num_labels=len(data.get_labels()),
-            dropout_prob=0.1,
+            dropout_prob=dropout_prob,
             w2v_mapping=w2v_model
         )
+    elif model_name == "SemAttention":
+        model = SemAttention(
+            in_feat=in_feat,
+            num_labels = len(data.get_labels()),
+            dropout_prob=dropout_prob,
+            w2v_mapping=w2v_model
+        )
+    elif model_name == "Bert":
+        model = BertForSequenceClassification.from_pretrained(w2v_path,num_labels=len(data.get_labels()))
+    
+        
+    print(model)
+    # model_paramters = model.parameters()
+    print('Model Name: '+model_name)
+    print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
     
     
     checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
     model.load_state_dict(checkpoint['state_dict'])
-    # print(checkpoint['state_dict'])
     model.to(device)
     model.eval()
     
@@ -71,12 +98,21 @@ def inference(args):
         text_a = text_example.get('text_a')
         text_b = text_example.get('text_b')
         idx = text_example.get('idx')
-        text_a_inputs_id = text_example.get("text_a_inputs_id").to(device)
-        text_b_inputs_id = text_example.get("text_b_inputs_id").to(device)
-        text_a_attention_mask = text_example.get("text_a_attention_mask").to(device)
-        text_b_attention_mask = text_example.get("text_b_attention_mask").to(device)
+        if model_name in model_type1_list:
+            text_a_inputs_id = text_example.get("text_a_inputs_id").to(device)
+            text_b_inputs_id = text_example.get("text_b_inputs_id").to(device)
+            text_a_attention_mask = text_example.get("text_a_attention_mask").to(device)
+            text_b_attention_mask = text_example.get("text_b_attention_mask").to(device)
+        elif model_name in model_type2_list:
+            input_ids = text_example.get('input_ids').to(device)
+            token_type_ids = text_example.get('token_type_ids').to(device)
+            attention_mask = text_example.get('attention_mask').to(device)
         with torch.no_grad():
-            outputs = model(text_a_inputs_id,text_b_inputs_id,text_a_attention_mask,text_b_attention_mask)
+            if model_name in model_type1_list:
+                outputs = model(text_a_inputs_id,text_b_inputs_id,text_a_attention_mask,text_b_attention_mask)
+            elif model_name in model_type2_list:
+                outputs = model(input_ids=input_ids,token_type_ids=token_type_ids,attention_mask=attention_mask,return_dict=True).get('logits')
+ 
             probs = nn.Softmax(dim=1)(outputs)
             preds = torch.max(probs,1)[1].data.cpu()
             # print(preds)
@@ -111,7 +147,7 @@ def inference(args):
 if __name__ == "__main__":
     parse = argparse.ArgumentParser()
     
-    parse.add_argument('--model_name',type=str,default="SemNN",help="Model name for train")
+    parse.add_argument('--model_name',type=str,default="SemAttention",help="Model name for train")
     
     parse.add_argument('--in_feat',type=int,default=100,help="Length of features for embbeding word")
     
@@ -121,11 +157,11 @@ if __name__ == "__main__":
     
     parse.add_argument('--max_length',type=int,default=32,help="Max length for setence")
     
-    parse.add_argument('--savepath',type=str,default="./results",help="Save dir for trained model")
+    parse.add_argument('--savepath',type=str,default="./results/SemAttention",help="Save dir for trained model")
     
     parse.add_argument('--datadir',type=str,default='./data',help="Data path for train and test")
     
-    parse.add_argument('--model_path',type=str,default='./results/best_model.pth.tar',help="Saved model path")
+    parse.add_argument('--model_path',type=str,default='./results/SemAttention/best_model.pth.tar',help="Saved model path")
     
     parse.add_argument('--gpu',type=str,default='1',help="Gpu id for train")
     
