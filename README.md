@@ -1,25 +1,25 @@
-# 医学搜索Query相关性判断
+# Medical search Query relevance judgment
 
-## 赛题描述
-Query（即搜索词）之间的相关性是评估两个Query所表述主题的匹配程度，即判断Query-A和Query-B是否发生转义，以及转义的程度。Query的主题是指query的专注点，判定两个查询词之间的相关性是一项重要的任务，常用于长尾query的搜索质量优化场景，本任务数据集就是在这样的背景下产生的。
+## Question description
+Correlation between queries (i.e., search terms) evaluates how well two queries match the topics expressed by them, that is, whether and to what extent Query-A and Query-B are escaped. The topic of Query refers to the focus of query, and determining the correlation between two query terms is an important task, which is often used in the search quality optimization scenario of long-tail query. This task data set is generated under such background.
 <div align=center>
 
 ![examples](./pic/1.png)
 </div>
 
-## 数据集说明
+## Dataset introduction
 
-[相关数据集下载](https://tianchi.aliyun.com/competition/entrance/532001/information)
+[Download](https://tianchi.aliyun.com/competition/entrance/532001/information)
 
-Query和Title的相关度共分为3档（0-2），0分为相关性最差，2分表示相关性最好。
+The correlation between Query and Title is divided into three levels (0-2). 0 is the worst correlation, and 2 is the best correlation.
 
-2分：表示A与B等价，表述完全一致
+2 points: indicates that A and B are equivalent, the expression is completely consistent
 
-1分： B为A的语义子集，B指代范围小于A
+1 score: B is the semantic subset of A, and B refers to A scope less than A
 
-0分：B为A的语义父集，B指代范围大于A； 或者A与B语义毫无关联
+0 score: B is the semantic parent set of A, B refers to A range greater than A; Or A has nothing to do with B semantics
 
-## 环境依赖
+## Environment
 
 ```shell
 pip install gensim
@@ -28,25 +28,46 @@ pip install tqdm
 conda install torch
 ```
 
-## 准备
-从腾讯AI Lab下载语料库
+## Prepare
+Download corpus from Tencent AI Lab
 ```shell
-wget https://ai.tencent.com/ailab/nlp/zh/data/tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz # v0.2.0 100维-Small
+wget https://ai.tencent.com/ailab/nlp/zh/data/tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz # v0.2.0 100 demention-Small
 ```
-解压语料库
+Decompress the corpus
 ```shell
 tar -zxvf tencent-ailab-embedding-zh-d100-v0.2.0-s.tar.gz
 ```
 
-## 训练
+## Train
+
 ```python
-python train.py --datadir {datadir} --epochs 30 --lr 1e-4 --max_length 32 --batch_size 8 --savepath ./results --gpu 0 --w2v_path {w2v_path}
+python train.py --model_name {model_name} --datadir {datadir} --epochs 30 --lr 1e-4 --max_length 32 --batch_size 8 --savepath ./results --gpu 0 --w2v_path {w2v_path}
+```
+Or run the scripts
+
+```shell
+sh scripts/train.sh
 ```
 
-## 推理
+## Inference
 ```python
-python inference.py --batch_size 8 --max_length 32 --savepath ./results --datadir {datadir} --model_path {model_path} --gpu 0 --w2v_path {w2v_path}
+python inference.py --model_name {model_name} --batch_size 8 --max_length 32 --savepath ./results --datadir {datadir} --model_path {model_path} --gpu 0 --w2v_path {w2v_path}
+```
+Or run the scripts
+
+```shell
+sh scripts/inference.sh
 ```
 
+## Results
 
+<div align=center>
 
+| Model | Params(M) | Train Acc(%) |Val Acc(%)|Test Acc(%)|
+| :----:| :----: | :----: |:----:|:----:|
+| SemNN |  |  |||
+| SemLSTM |  |  |||
+| SemAttention | |  |||
+| Bert |  |  |||
+
+</div>
