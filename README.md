@@ -66,9 +66,9 @@ sh scripts/inference.sh
 
 | Model | Params(M) | Train Acc(%) |Val Acc(%)|Test Acc(%)|
 | :----:| :----: | :----: |:----:|:----:|
-| SemNN |  |  |||
+| SemNN |  |  ||61.41|
 | SemLSTM |  |  |||
-| SemAttention | |  |||
-| Bert |  |  |||
+| SemAttention | |  ||75,57|
+| Bert |  |  ||82.65|
 
 </div>
