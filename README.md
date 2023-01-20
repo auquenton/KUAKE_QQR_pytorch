@@ -19,6 +19,26 @@ The correlation between Query and Title is divided into three levels (0-2). 0 is
 
 0 score: B is the semantic parent set of A, B refers to A range greater than A; Or A has nothing to do with B semantics
 
+## Structure
+```
+·
+├── data
+│   ├──  example_pred.json
+│   ├── KUAKE-QQR_dev.json
+│   ├── KUAKE-QQR_test.json
+│   └── KUAKE-QQR_train.json
+├── pic
+│   └── 1.png
+├── scripts
+│   ├── inference.sh
+│   ├── eval.sh
+│   └── train.sh
+├── train.py
+├── eval.py
+├── inference.py   
+└── README.md
+```
+
 ## Environment
 
 ```shell
