@@ -26,6 +26,7 @@ pip install gensim
 pip install numpy
 pip install tqdm
 conda install torch
+pip install transformer
 ```
 
 ## Prepare
