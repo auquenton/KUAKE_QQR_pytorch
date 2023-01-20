@@ -4,7 +4,7 @@ import numpy as np
 from torch.nn.utils.rnn import pack_padded_sequence,pad_packed_sequence
 
 
-class LstmEncoder(nn.Module):
+class LstmAttEncoder(nn.Module):
     def __init__(self, in_feat: int = 100):
         super().__init__()
         self.lstm = nn.LSTM(input_size=in_feat, hidden_size=in_feat, bidirectional=True, batch_first=True)
@@ -47,6 +47,21 @@ class Encoder(nn.Module):
         x = self.act(self.linear2(self.dropout(x)))
         
         return x
+
+class LstmEncoder(nn.Module):
+
+    def __init__(self, in_feat: int = 100, dropout_prob: float = 0.1):
+        super().__init__()
+
+        self.lstm = nn.LSTM(input_size=in_feat, hidden_size=in_feat, bidirectional=True, batch_first=True)
+
+    def forward(self, token_embeds, attention_mask):
+        batch_size = attention_mask.size(0)
+        output, (h, c) = self.lstm(token_embeds)
+        output, lens_output = pad_packed_sequence(output, batch_first=True)
+        # 双向LSTM出来的hidden states做平均
+        output = torch.stack([output[i][:lens_output[i]].mean(dim=0) for i in range(batch_size)], dim=0)
+        return output
 
 
 class Classifier(nn.Module):
@@ -101,6 +116,7 @@ class SemNN(nn.Module):
         logits = self.classifier(pooler_output)
         
         return logits
+
 
 class CrossAttention(nn.Module):
     def __init__(self,in_feat,dropout_prob):
@@ -206,7 +222,7 @@ class SemAttention(nn.Module):
         super().__init__()
         self.num_labels = num_labels
         self._init_word_embedding(w2v_mapping,vocab_size,word_embedding_dim)
-        self.encoder = LstmEncoder(in_feat=in_feat)
+        self.encoder = LstmAttEncoder(in_feat=in_feat)
         self.classifier = Classifier(in_feat=4*in_feat,num_labels=num_labels,dropout_prob=dropout_prob)
         self.crossattention = CrossAttention(in_feat=2*in_feat,dropout_prob=dropout_prob)
         self.decoder = LstmDecoder(in_feat=in_feat,dropout_prob=dropout_prob)
