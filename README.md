@@ -27,6 +27,17 @@ The correlation between Query and Title is divided into three levels (0-2). 0 is
 │   ├── KUAKE-QQR_dev.json
 │   ├── KUAKE-QQR_test.json
 │   └── KUAKE-QQR_train.json
+├── tencent-ailab-embedding-zh-d100-v0.2.0-s
+│   ├── tencent-ailab-embedding-zh-d100-v0.2.0-s.txt
+│   └── readme.txt
+├── chinese-bert-wwm-ext
+│   ├── added_tokens.json
+│   ├── config.json
+│   ├── pytorch_model.bin
+│   ├── special_tokens_map.json
+│   ├── tokenizer_config.json
+│   ├── tokenizer.json
+│   └── vocab.txt
 ├── pic
 │   └── 1.png
 ├── scripts
@@ -35,6 +46,7 @@ The correlation between Query and Title is divided into three levels (0-2). 0 is
 │   └── train.sh
 ├── train.py
 ├── eval.py
+├── models.py
 ├── inference.py   
 └── README.md
 ```
