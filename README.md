@@ -94,6 +94,17 @@ Or run the scripts
 sh scripts/train.sh
 ```
 
+## Eval
+
+```python
+python eval.py --model_name {model_name} --w2v_path {w2v_path} --model_path {model_path}
+```
+Or run the scripts
+
+```shell
+sh scripts/eval.sh
+```
+
 ## Inference
 ```python
 python inference.py --model_name {model_name} --batch_size 8 --max_length 32 --savepath ./results --datadir {datadir} --model_path {model_path} --gpu 0 --w2v_path {w2v_path}
